@@ -1,0 +1,14 @@
+.idea/
+__pycache__/
+.pytest_cache/
+
+# Dart
+dart/.dart_tool/
+dart/pubspec.lock
+dart/build/
+
+# Python
+python/.venv/
+python/build/
+python/dist/
+python/*.egg-info/

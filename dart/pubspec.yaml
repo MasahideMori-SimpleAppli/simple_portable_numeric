@@ -1,0 +1,11 @@
+name: simple_portable_numeric
+description: "Arbitrary-precision decimal and rational arithmetic that gives identical results in Dart and Python."
+version: 0.0.1
+repository: https://github.com/MasahideMori-SimpleAppli/simple_portable_numeric/tree/main/dart
+
+environment:
+  sdk: ^3.8.1
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^6.0.0
