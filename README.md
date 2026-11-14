@@ -1,7 +1,7 @@
 # simple_portable_numeric
 
 (en)Japanese ver
-is here ([Dart](https://github.com/MasahideMori-SimpleAppli/simple_portable_numeric/blob/main/dart/README_JA.md) / [Python](https://github.com/MasahideMori-SimpleAppli/simple_portable_numeric/blob/main/python/README_JA.md)).
+is here ([Dart](https://github.com/MasahideMori-SimpleAppli/simple_portable_numeric/blob/main/dart/README_JA.md) / [Python](https://github.com/MasahideMori-SimpleAppli/simple_portable_numeric/blob/main/python/README_JA.md)).  
 (ja)
 この解説の日本語版はこちら（[Dart](https://github.com/MasahideMori-SimpleAppli/simple_portable_numeric/blob/main/dart/README_JA.md) / [Python](https://github.com/MasahideMori-SimpleAppli/simple_portable_numeric/blob/main/python/README_JA.md)）にあります。
 
