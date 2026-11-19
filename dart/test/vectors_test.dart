@@ -19,10 +19,21 @@ double _parseDouble(String s) => switch (s) {
 };
 
 Object _runDecimal(Map<String, dynamic> c) {
+  if (c["op"] == "parseLenient") {
+    return PortableDecimal.parseLenient(c["a"] as String).toString();
+  }
   final a = PortableDecimal.parse(c["a"] as String);
   switch (c["op"]) {
     case "parse":
       return a.toString();
+    case "pow":
+      return a.pow(c["n"] as int).toString();
+    case "stripTrailingZeros":
+      return a.stripTrailingZeros().toString();
+    case "isInteger":
+      return a.isInteger;
+    case "toBigInt":
+      return a.toBigInt(_mode(c)).toString();
     case "neg":
       return (-a).toString();
     case "abs":
@@ -59,6 +70,14 @@ Object _runRational(Map<String, dynamic> c) {
       return a.toDouble();
     case "toDecimal":
       return a.toDecimal(c["scale"] as int, _mode(c)).toString();
+    case "pow":
+      return a.pow(c["n"] as int).toString();
+    case "isInteger":
+      return a.isInteger;
+    case "toBigInt":
+      return a.toBigInt(_mode(c)).toString();
+    case "toDecimalExact":
+      return a.toDecimalExact().toString();
   }
   final b = PortableRational.parse(c["b"] as String);
   return switch (c["op"]) {

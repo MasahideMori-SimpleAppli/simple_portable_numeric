@@ -42,6 +42,8 @@ BigInt roundDiv(BigInt n, BigInt d, EnumRoundingMode rounding) {
       return up;
     case EnumRoundingMode.down:
       return n.isNegative ? up : q;
+    case EnumRoundingMode.up:
+      return n.isNegative ? q : up;
     case EnumRoundingMode.halfUp:
     case EnumRoundingMode.halfEven:
       final int c = (r << 1).compareTo(d);

@@ -88,10 +88,59 @@ def test_huge_digit_strings_beyond_python_int_limit():
 
 
 def test_rounding_mode_values_match_dart_names():
-    assert [m.value for m in EnumRoundingMode] == ["halfEven", "halfUp", "down", "floor", "ceiling"]
-    assert [m.name for m in EnumRoundingMode] == ["halfEven", "halfUp", "down", "floor", "ceiling"]
+    assert [m.value for m in EnumRoundingMode] == ["halfEven", "halfUp", "down", "floor", "ceiling", "up"]
+    assert [m.name for m in EnumRoundingMode] == ["halfEven", "halfUp", "down", "floor", "ceiling", "up"]
 
 
 def test_to_rational_round_trip():
     for s in ["0.125", "-3.50", "0", "123456789.987654321"]:
         assert D(s).to_rational().to_decimal(D(s).scale, EnumRoundingMode.halfEven) == D(s)
+
+
+def test_pow_operator():
+    assert D("1.5") ** 2 == D("2.25")
+    assert (D("1.5") ** 2).scale == 2
+    assert R("2/3") ** -2 == R("9/4")
+    with pytest.raises(TypeError):
+        D("2") ** D("2")
+    with pytest.raises(TypeError):
+        D("2") ** True
+    with pytest.raises(TypeError):
+        pow(D("2"), 2, 5)
+    with pytest.raises(TypeError):
+        pow(R("2"), 2, 5)
+    with pytest.raises(TypeError):
+        D("2").pow(2.0)
+    with pytest.raises(ValueError):
+        D("2") ** -1
+
+
+def test_new_methods_return_documented_types():
+    assert type(D("2.5").to_int(EnumRoundingMode.up)) is int
+    assert R("-5/2").to_int(EnumRoundingMode.up) == -3
+    assert D("1.00").is_integer() is True
+    assert R("3/8").to_decimal_exact() == D("0.375")
+    with pytest.raises(ValueError):
+        R("1/3").to_decimal_exact()
+    with pytest.raises(TypeError):
+        PortableDecimal.parse_lenient(1.5)
+
+
+def test_strip_trailing_zeros_keeps_equality_and_hash():
+    for s in ["1.500", "-0.000", "100.00", "0.0100"]:
+        assert D(s).strip_trailing_zeros() == D(s)
+        assert hash(D(s).strip_trailing_zeros()) == hash(D(s))
+
+
+def test_parse_lenient_reads_repr_back_to_the_same_float():
+    for x in [0.1, 1e-7, 1.5e300, 5e-324, 1.7976931348623157e308, 1e16, 1e21, -2.2250738585072014e-308, 123456.789]:
+        assert PortableDecimal.parse_lenient(repr(x)).to_float() == x
+
+
+def test_parse_lenient_with_huge_mantissa_and_exponent():
+    digits = "1234567890" * 1000
+    d = PortableDecimal.parse_lenient(digits + "." + digits + "e-324")
+    assert d.scale == len(digits) + 324
+    assert d.to_string() == digits[:-324] + "." + digits[-324:] + digits
+    with pytest.raises(ValueError):
+        PortableDecimal.parse_lenient("1e" + "0" * 5000 + "325")

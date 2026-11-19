@@ -141,6 +141,76 @@ class PortableRational:
     def __abs__(self) -> PortableRational:
         return PortableRational(abs(self._numerator), self._denominator)
 
+    def pow(self, n: int) -> PortableRational:
+        """
+        (en) Returns this value raised to the power n. Exact, in canonical form.
+        A negative n gives (1 / self)^|n|. pow(0) is 1, also for zero.
+        a ** n is the same.
+
+        (ja) この値の n 乗を返します。正確で、結果は正規形です。
+        負の n は (1 / self)^|n| です。pow(0) はゼロの場合も1です。
+        a ** n も同じです。
+
+        Parameters
+        ----------
+        n: int
+            The exponent. Any integer.
+
+        Returns
+        -------
+        PortableRational
+            The power.
+
+        Raises
+        ------
+        ZeroDivisionError
+            If this value is zero and n is negative.
+        """
+        _check_int(n, "n")
+        if n >= 0:
+            return PortableRational(self._numerator ** n, self._denominator ** n)
+        if self._numerator == 0:
+            raise ZeroDivisionError("Division by zero")
+        return PortableRational(self._denominator ** -n, self._numerator ** -n)
+
+    def __pow__(self, n: object, mod: object = None) -> PortableRational:
+        if mod is not None:
+            raise TypeError("pow() with a modulus is not supported")
+        if isinstance(n, bool) or not isinstance(n, int):
+            return NotImplemented
+        return self.pow(n)
+
+    def is_integer(self) -> bool:
+        """
+        (en) Returns whether this value is an integer (the denominator is 1).
+
+        (ja) この値が整数（分母が1）かどうかを返します。
+
+        Returns
+        -------
+        bool
+            True if this value is an integer.
+        """
+        return self._denominator == 1
+
+    def to_int(self, rounding: EnumRoundingMode) -> int:
+        """
+        (en) Rounds this value once to an integer.
+
+        (ja) この値を1回だけ丸めて整数にします。
+
+        Parameters
+        ----------
+        rounding: EnumRoundingMode
+            The rounding mode.
+
+        Returns
+        -------
+        int
+            The rounded integer.
+        """
+        return round_div(self._numerator, self._denominator, rounding)
+
     def compare_to(self, other: PortableRational) -> int:
         """
         (en) Compares by numeric value.
@@ -214,6 +284,37 @@ class PortableRational:
         if scale < 0:
             raise ValueError(f"scale must be 0 or more, got {scale}")
         return PortableDecimal(round_div(self._numerator * 10 ** scale, self._denominator, rounding), scale)
+
+    def to_decimal_exact(self) -> PortableDecimal:
+        """
+        (en) Converts this value exactly to a finite decimal with the smallest scale,
+        e.g. 3/8 -> 0.375. This is possible only when the denominator is 2^p * 5^q.
+
+        (ja) この値を、最小のscaleの有限小数に正確に変換します（例: 3/8 -> 0.375）。
+        分母が 2^p * 5^q の場合のみ変換できます。
+
+        Returns
+        -------
+        PortableDecimal
+            The equal decimal value.
+
+        Raises
+        ------
+        ValueError
+            If this value is not a finite decimal (e.g. 1/3).
+        """
+        d = self._denominator
+        p = q = 0
+        while d % 2 == 0:
+            d //= 2
+            p += 1
+        while d % 5 == 0:
+            d //= 5
+            q += 1
+        if d != 1:
+            raise ValueError("The value is not a finite decimal")
+        scale = max(p, q)
+        return PortableDecimal(self._numerator * 10 ** scale // self._denominator, scale)
 
     def to_float(self) -> float:
         """

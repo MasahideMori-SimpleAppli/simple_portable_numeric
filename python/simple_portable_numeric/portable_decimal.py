@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from simple_portable_numeric.portable_rational import PortableRational
 
 _DECIMAL_PATTERN = re.compile(r"[+-]?[0-9]+(\.[0-9]+)?")
+_LENIENT_PATTERN = re.compile(r"([+-]?)([0-9]*)(?:\.([0-9]*))?(?:[eE]([+-]?)([0-9]+))?")
+_MAX_LENIENT_EXPONENT = 324  # The largest absolute exponent accepted by parse_lenient (see SPEC 2.5).
 
 
 def _check_int(value: object, name: str) -> None:
@@ -85,6 +87,58 @@ class PortableDecimal:
         negative = int_part.startswith("-")
         value = digits_to_int(int_part.lstrip("+-") + frac_part)
         return cls(-value if negative else value, len(frac_part))
+
+    @classmethod
+    def parse_lenient(cls, text: str) -> PortableDecimal:
+        """
+        (en) Parses a decimal string more leniently than parse.
+        In addition to the plain notation, it accepts exponent notation such as
+        "1.2E-05" (e or E, absolute exponent up to 324) and an omitted integer or
+        fractional part such as ".5" or "1.". The scale is
+        max(0, number of fractional digits - exponent).
+        Whitespace, "_", thousands separators, "%", NaN and Infinity are rejected.
+
+        (ja) parse より緩く10進文字列を解析します。
+        通常表記に加えて、"1.2E-05" のような指数表記（e または E、指数の絶対値は324まで）と、
+        ".5" や "1." のような整数部・小数部の省略を受け付けます。
+        scaleは max(0, 小数部の桁数 - 指数) です。
+        空白、"_"、桁区切り、"%"、NaN、Infinity は受け付けません。
+
+        Parameters
+        ----------
+        text: str
+            The string to parse.
+
+        Returns
+        -------
+        PortableDecimal
+            The parsed value.
+
+        Raises
+        ------
+        ValueError
+            If the string is not valid or the exponent is out of range.
+        """
+        if not isinstance(text, str):
+            raise TypeError(f"text must be str, got {type(text).__name__}")
+        m = _LENIENT_PATTERN.fullmatch(text)
+        int_part = (m.group(2) or "") if m else ""
+        frac_part = (m.group(3) or "") if m else ""
+        if m is None or not (int_part or frac_part):
+            raise ValueError(f"Invalid decimal string: {text!r}")
+        exp = 0
+        if m.group(5) is not None:
+            trimmed = m.group(5).lstrip("0")
+            if len(trimmed) > 3 or int("0" + trimmed) > _MAX_LENIENT_EXPONENT:
+                raise ValueError(f"Exponent out of range: {text!r}")
+            exp = -int("0" + trimmed) if m.group(4) == "-" else int("0" + trimmed)
+        value = digits_to_int(int_part + frac_part)
+        if m.group(1) == "-":
+            value = -value
+        scale = len(frac_part) - exp
+        if scale >= 0:
+            return cls(value, scale)
+        return cls(value * 10 ** (-scale), 0)
 
     @property
     def unscaled_value(self) -> int:
@@ -205,6 +259,96 @@ class PortableDecimal:
             return PortableDecimal(self._unscaled_value * 10 ** (scale - self._scale), scale)
         return PortableDecimal(round_div(self._unscaled_value, 10 ** (self._scale - scale), rounding), scale)
 
+    def pow(self, n: int) -> PortableDecimal:
+        """
+        (en) Returns this value raised to the power n. Exact.
+        The result scale is scale * n. pow(0) is 1 with scale 0.
+        a ** n is the same.
+
+        (ja) この値の n 乗を返します。正確です。
+        結果のscaleは scale * n です。pow(0) はscale 0の1です。
+        a ** n も同じです。
+
+        Parameters
+        ----------
+        n: int
+            The exponent. Must be 0 or more.
+            Use to_rational().pow(n) for a negative exponent.
+
+        Returns
+        -------
+        PortableDecimal
+            The power.
+
+        Raises
+        ------
+        ValueError
+            If n is negative.
+        """
+        _check_int(n, "n")
+        if n < 0:
+            raise ValueError(f"n must be 0 or more, got {n}")
+        return PortableDecimal(self._unscaled_value ** n, self._scale * n)
+
+    def __pow__(self, n: object, mod: object = None) -> PortableDecimal:
+        if mod is not None:
+            raise TypeError("pow() with a modulus is not supported")
+        if isinstance(n, bool) or not isinstance(n, int):
+            return NotImplemented
+        return self.pow(n)
+
+    def strip_trailing_zeros(self) -> PortableDecimal:
+        """
+        (en) Returns an equal value with the trailing zeros of the fractional part
+        removed, e.g. 1.500 -> 1.5. The scale never goes below 0 (100 stays 100).
+
+        (ja) 小数部の末尾のゼロを取り除いた、等しい値を返します（例: 1.500 -> 1.5）。
+        scaleは0未満になりません（100 は 100 のまま）。
+
+        Returns
+        -------
+        PortableDecimal
+            The value without trailing zeros.
+        """
+        u, s = self._unscaled_value, self._scale
+        while s > 0 and u % 10 == 0:
+            u //= 10
+            s -= 1
+        return PortableDecimal(u, s)
+
+    def is_integer(self) -> bool:
+        """
+        (en) Returns whether this value is an integer (1.00 is an integer).
+
+        (ja) この値が整数かどうかを返します（1.00 は整数です）。
+
+        Returns
+        -------
+        bool
+            True if this value is an integer.
+        """
+        return self._unscaled_value % 10 ** self._scale == 0
+
+    def to_int(self, rounding: EnumRoundingMode) -> int:
+        """
+        (en) Rounds this value once to an integer.
+        The value is the same as set_scale(0, rounding).
+
+        (ja) この値を1回だけ丸めて整数にします。
+        値は set_scale(0, rounding) と同じです。
+
+        Parameters
+        ----------
+        rounding: EnumRoundingMode
+            The rounding mode.
+
+        Returns
+        -------
+        int
+            The rounded integer.
+        """
+        return round_div(self._unscaled_value, 10 ** self._scale, rounding)
+
     def compare_to(self, other: PortableDecimal) -> int:
         """
         (en) Compares by numeric value.
@@ -252,11 +396,8 @@ class PortableDecimal:
         return self.compare_to(other) >= 0
 
     def __hash__(self) -> int:
-        u, s = self._unscaled_value, self._scale
-        while s > 0 and u % 10 == 0:
-            u //= 10
-            s -= 1
-        return hash((u, s))
+        s = self.strip_trailing_zeros()
+        return hash((s._unscaled_value, s._scale))
 
     def to_rational(self) -> PortableRational:
         """

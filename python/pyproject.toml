@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simple_portable_numeric"
-version = "0.0.1"
+version = "0.1.0"
 description = "Arbitrary-precision decimal and rational arithmetic that gives identical results in Dart and Python."
 readme = "README.md"
 license = "Apache-2.0"

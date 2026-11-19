@@ -22,9 +22,19 @@ def _float_text(x: float) -> str:
 def _run_decimal(c: dict):
     D = PortableDecimal.parse
     op = c["op"]
+    if op == "parseLenient":
+        return PortableDecimal.parse_lenient(c["a"]).to_string()
     a = D(c["a"])
     if op == "parse":
         return a.to_string()
+    if op == "pow":
+        return a.pow(c["n"]).to_string()
+    if op == "stripTrailingZeros":
+        return a.strip_trailing_zeros().to_string()
+    if op == "isInteger":
+        return a.is_integer()
+    if op == "toBigInt":
+        return str(a.to_int(EnumRoundingMode(c["rounding"])))
     if op == "neg":
         return (-a).to_string()
     if op == "abs":
@@ -65,6 +75,14 @@ def _run_rational(c: dict):
         return _float_text(a.to_float())
     if op == "toDecimal":
         return a.to_decimal(c["scale"], EnumRoundingMode(c["rounding"])).to_string()
+    if op == "pow":
+        return a.pow(c["n"]).to_string()
+    if op == "isInteger":
+        return a.is_integer()
+    if op == "toBigInt":
+        return str(a.to_int(EnumRoundingMode(c["rounding"])))
+    if op == "toDecimalExact":
+        return a.to_decimal_exact().to_string()
     b = R(c["b"])
     if op == "add":
         return (a + b).to_string()

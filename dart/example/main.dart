@@ -25,7 +25,7 @@ void main() {
   for (final mode in EnumRoundingMode.values) {
     print("${mode.name}: ${x.setScale(0, mode)}");
   }
-  // halfEven: -2, halfUp: -3, down: -2, floor: -3, ceiling: -2
+  // halfEven: -2, halfUp: -3, down: -2, floor: -3, ceiling: -2, up: -3
 
   // Rational: exact + - * /, always reduced.
   final r = PortableRational.parse("1/3") + PortableRational.parse("1/6");
@@ -36,6 +36,14 @@ void main() {
   // Conversion.
   print(PortableDecimal.parse("0.1").toRational()); // 1/10
   print(PortableRational.parse("1/3").toDouble()); // 0.3333333333333333
+  print(PortableRational.parse("3/8").toDecimalExact()); // 0.375
+  print(PortableDecimal.parse("1.500").stripTrailingZeros()); // 1.5
+
+  // Integers and powers.
+  print(PortableDecimal.parse("2.5").toBigInt(EnumRoundingMode.up)); // 3
+  print(PortableDecimal.parse("1.00").isInteger); // true
+  print(PortableDecimal.parse("1.5").pow(2)); // 2.25
+  print(PortableRational.parse("2/3").pow(-2)); // 9/4
 
   // Invalid strings are rejected.
   try {
@@ -43,4 +51,7 @@ void main() {
   } on FormatException catch (e) {
     print(e.message); // Invalid decimal string
   }
+
+  // parseLenient also reads exponent notation, e.g. values exported from spreadsheet software.
+  print(PortableDecimal.parseLenient("1.2E-05")); // 0.000012
 }

@@ -3,6 +3,12 @@ import 'package:simple_portable_numeric/src/portable_rational.dart';
 import 'package:simple_portable_numeric/src/util_int_math.dart';
 
 final RegExp _decimalPattern = RegExp(r'^[+-]?[0-9]+(\.[0-9]+)?$');
+final RegExp _lenientPattern = RegExp(
+  r'^([+-]?)([0-9]*)(?:\.([0-9]*))?(?:[eE]([+-]?)([0-9]+))?$',
+);
+
+/// The largest absolute exponent accepted by parseLenient (see SPEC 2.5).
+const int _maxLenientExponent = 324;
 
 void _checkScale(int scale) {
   if (scale < 0) {
@@ -80,6 +86,47 @@ class PortableDecimal implements Comparable<PortableDecimal> {
       negative ? -value : value,
       dot < 0 ? 0 : body.length - dot - 1,
     );
+  }
+
+  /// (en) Parses a decimal string more leniently than [PortableDecimal.parse].
+  /// In addition to the plain notation, it accepts exponent notation such as
+  /// "1.2E-05" (e or E, absolute exponent up to 324) and an omitted integer or
+  /// fractional part such as ".5" or "1.". The scale is
+  /// max(0, number of fractional digits - exponent).
+  /// Whitespace, "_", thousands separators, "%", NaN and Infinity are rejected.
+  ///
+  /// (ja) [PortableDecimal.parse] より緩く10進文字列を解析します。
+  /// 通常表記に加えて、"1.2E-05" のような指数表記（e または E、指数の絶対値は324まで）と、
+  /// ".5" や "1." のような整数部・小数部の省略を受け付けます。
+  /// scaleは max(0, 小数部の桁数 - 指数) です。
+  /// 空白、"_"、桁区切り、"%"、NaN、Infinity は受け付けません。
+  ///
+  /// * [text] : The string to parse.
+  ///
+  /// Throws [FormatException] if [text] is not a valid string.
+  factory PortableDecimal.parseLenient(String text) {
+    final RegExpMatch? m = _lenientPattern.firstMatch(text);
+    final String intPart = m?.group(2) ?? "";
+    final String fracPart = m?.group(3) ?? "";
+    if (m == null || intPart.isEmpty && fracPart.isEmpty) {
+      throw FormatException("Invalid decimal string", text);
+    }
+    int exp = 0;
+    final String? expDigits = m.group(5);
+    if (expDigits != null) {
+      final String trimmed = expDigits.replaceFirst(RegExp(r'^0+'), "");
+      if (trimmed.length > 3 || int.parse("0$trimmed") > _maxLenientExponent) {
+        throw FormatException("Exponent out of range", text);
+      }
+      exp = int.parse("0$trimmed");
+      if (m.group(4) == "-") exp = -exp;
+    }
+    BigInt value = BigInt.parse(intPart + fracPart);
+    if (m.group(1) == "-") value = -value;
+    final int scale = fracPart.length - exp;
+    return scale >= 0
+        ? PortableDecimal(value, scale)
+        : PortableDecimal(value * pow10(-scale), 0);
   }
 
   /// Returns [unscaledValue] of this and [other] aligned to a common scale.
@@ -177,6 +224,54 @@ class PortableDecimal implements Comparable<PortableDecimal> {
     );
   }
 
+  /// (en) Returns this value raised to the power [n]. Exact.
+  /// The result scale is scale * n. pow(0) is 1 with scale 0.
+  ///
+  /// (ja) この値の [n] 乗を返します。正確です。
+  /// 結果のscaleは scale * n です。pow(0) はscale 0の1です。
+  ///
+  /// * [n] : The exponent. Must be 0 or more.
+  /// Use toRational().pow(n) for a negative exponent.
+  ///
+  /// Throws [ArgumentError] if [n] is negative.
+  PortableDecimal pow(int n) {
+    if (n < 0) {
+      throw ArgumentError.value(n, "n", "must be 0 or more");
+    }
+    return PortableDecimal(unscaledValue.pow(n), scale * n);
+  }
+
+  /// (en) Returns an equal value with the trailing zeros of the fractional
+  /// part removed, e.g. 1.500 -> 1.5. The scale never goes below 0 (100 stays 100).
+  ///
+  /// (ja) 小数部の末尾のゼロを取り除いた、等しい値を返します（例: 1.500 -> 1.5）。
+  /// scaleは0未満になりません（100 は 100 のまま）。
+  PortableDecimal stripTrailingZeros() {
+    final BigInt ten = BigInt.from(10);
+    BigInt u = unscaledValue;
+    int s = scale;
+    while (s > 0 && u.remainder(ten) == BigInt.zero) {
+      u = u ~/ ten;
+      s--;
+    }
+    return PortableDecimal(u, s);
+  }
+
+  /// (en) Whether this value is an integer (1.00 is an integer).
+  ///
+  /// (ja) この値が整数かどうかです（1.00 は整数です）。
+  bool get isInteger => unscaledValue.remainder(pow10(scale)) == BigInt.zero;
+
+  /// (en) Rounds this value once to an integer.
+  /// The value is the same as setScale(0, rounding).
+  ///
+  /// (ja) この値を1回だけ丸めて整数にします。
+  /// 値は setScale(0, rounding) と同じです。
+  ///
+  /// * [rounding] : The rounding mode.
+  BigInt toBigInt(EnumRoundingMode rounding) =>
+      roundDiv(unscaledValue, pow10(scale), rounding);
+
   /// (en) Compares by numeric value.
   /// Returns -1 if this < other, 0 if equal, 1 if this > other.
   ///
@@ -207,13 +302,8 @@ class PortableDecimal implements Comparable<PortableDecimal> {
 
   @override
   int get hashCode {
-    BigInt u = unscaledValue;
-    int s = scale;
-    while (s > 0 && u.remainder(BigInt.from(10)) == BigInt.zero) {
-      u = u ~/ BigInt.from(10);
-      s--;
-    }
-    return Object.hash(u, s);
+    final PortableDecimal s = stripTrailingZeros();
+    return Object.hash(s.unscaledValue, s.scale);
   }
 
   /// (en) Converts this value to an exactly equal rational.

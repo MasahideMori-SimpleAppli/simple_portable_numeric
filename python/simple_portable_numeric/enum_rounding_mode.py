@@ -15,3 +15,4 @@ class EnumRoundingMode(Enum):
     down = "down"  # Toward zero.
     floor = "floor"  # Toward negative infinity.
     ceiling = "ceiling"  # Toward positive infinity.
+    up = "up"  # Away from zero.

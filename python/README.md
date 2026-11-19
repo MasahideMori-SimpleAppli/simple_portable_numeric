@@ -21,7 +21,7 @@ so the number of digits, rounding and string format never differ between the lan
 - `PortableDecimal`: exact `+ - *` with no digit limit.
   Division always takes an explicit scale and rounding mode.
 - `PortableRational`: exact `+ - * /`, always kept reduced.
-- Five rounding modes: `halfEven`, `halfUp`, `down`, `floor`, `ceiling`.
+- Six rounding modes: `halfEven`, `halfUp`, `down`, `floor`, `ceiling`, `up` (away from zero).
 - Strict and stable string format, suitable for storing values as text (e.g. in a database).
 - Equality by value (`1.50 == 1.5`), while the string keeps the scale (`"1.50"`).
 - Correctly rounded conversion to double, identical in both languages.
@@ -53,15 +53,32 @@ print(PortableRational.parse("0.75"))  # 3/4
 # Conversion
 print(PortableDecimal.parse("0.1").to_rational())  # 1/10
 print(PortableRational.parse("1/3").to_float())  # 0.3333333333333333
+
+# Integers and powers
+print(PortableDecimal.parse("2.5").to_int(EnumRoundingMode.up))  # 3
+print(PortableDecimal.parse("1.00").is_integer())  # True
+print(PortableDecimal.parse("1.5") ** 2)  # 2.25
+print(PortableRational.parse("2/3") ** -2)  # 9/4
+
+# Exact decimal form and trailing zeros
+print(PortableRational.parse("3/8").to_decimal_exact())  # 0.375
+print(PortableDecimal.parse("1.500").strip_trailing_zeros())  # 1.5
+
+# Lenient parse (e.g. values exported from spreadsheet software)
+print(PortableDecimal.parse_lenient("1.2E-05"))  # 0.000012
 ```
 
 ## Notes
 
-- Strings must be plain notation such as `"-12.340"` or `"3/4"`.
+- `parse` accepts only plain notation such as `"-12.340"` or `"3/4"`, so that text stored in a database has one canonical form.
   Exponent notation (`"1e3"`), whitespace and non-ASCII digits are rejected.
+- `PortableDecimal.parse_lenient` additionally accepts exponent notation such as `"1.2E-05"` (absolute exponent up to 324)
+  and `".5"` / `"1."`. It is for reading external data such as values exported from spreadsheet software.
+  Whitespace, `"1,000"`, `"12%"`, NaN and Infinity are still rejected.
 - `PortableDecimal` and `PortableRational` are never mixed implicitly.
   Convert explicitly with `to_rational()` / `to_decimal(scale, rounding)`.
-- Conversion from double is not provided, because the string forms of doubles differ between languages.
+- Conversion from double is not provided directly. `PortableDecimal.parse_lenient(repr(x))` gives a value that converts back to the same double,
+  but the scale may differ between languages, because the string forms of doubles differ (e.g. `1e16`).
 - Hash values are consistent with equality, but are not the same across languages.
 
 ## Support

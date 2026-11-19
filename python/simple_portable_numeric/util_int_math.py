@@ -37,6 +37,8 @@ def round_div(n: int, d: int, rounding: EnumRoundingMode) -> int:
         return q + 1
     if rounding is EnumRoundingMode.down:
         return q if n >= 0 else q + 1
+    if rounding is EnumRoundingMode.up:
+        return q + 1 if n >= 0 else q
     twice = 2 * r
     if twice < d:
         return q

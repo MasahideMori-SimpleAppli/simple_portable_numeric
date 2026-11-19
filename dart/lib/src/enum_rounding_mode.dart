@@ -28,4 +28,9 @@ enum EnumRoundingMode {
   ///
   /// (ja) 正の無限大方向へ。
   ceiling,
+
+  /// (en) Away from zero.
+  ///
+  /// (ja) 0から遠い側へ（切り上げ）。
+  up,
 }

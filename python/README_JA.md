@@ -15,7 +15,7 @@ Pythonの `decimal`（デフォルトで有効桁数28桁）のような各言�
 - `PortableDecimal`：桁数の上限なしで `+ - *` を正確に計算します。
   割り算では、結果の桁数と丸めモードを必ず指定します。
 - `PortableRational`：`+ - * /` を正確に計算し、常に約分された状態を保ちます。
-- 5種類の丸めモード：`halfEven`、`halfUp`、`down`、`floor`、`ceiling`。
+- 6種類の丸めモード：`halfEven`、`halfUp`、`down`、`floor`、`ceiling`、`up`（0から遠い側への切り上げ）。
 - 厳密で安定した文字列形式のため、値をテキストとして（データベースなどに）保存するのに適しています。
 - 等価判定は値で行い（`1.50 == 1.5`）、文字列化では桁数を保持します（`"1.50"`）。
 - 倍精度浮動小数点数への変換は正しく丸められ、両言語で同一の結果になります。
@@ -47,15 +47,32 @@ print(PortableRational.parse("0.75"))  # 3/4
 # Conversion
 print(PortableDecimal.parse("0.1").to_rational())  # 1/10
 print(PortableRational.parse("1/3").to_float())  # 0.3333333333333333
+
+# Integers and powers
+print(PortableDecimal.parse("2.5").to_int(EnumRoundingMode.up))  # 3
+print(PortableDecimal.parse("1.00").is_integer())  # True
+print(PortableDecimal.parse("1.5") ** 2)  # 2.25
+print(PortableRational.parse("2/3") ** -2)  # 9/4
+
+# Exact decimal form and trailing zeros
+print(PortableRational.parse("3/8").to_decimal_exact())  # 0.375
+print(PortableDecimal.parse("1.500").strip_trailing_zeros())  # 1.5
+
+# Lenient parse (e.g. values exported from spreadsheet software)
+print(PortableDecimal.parse_lenient("1.2E-05"))  # 0.000012
 ```
 
 ## 注意事項
 
-- 文字列は `"-12.340"` や `"3/4"` のような通常表記である必要があります。
+- `parse` は `"-12.340"` や `"3/4"` のような通常表記のみを受け付けます。データベースなどに保存する文字列の形式を1つに保つためです。
   指数表記（`"1e3"`）、空白、ASCII以外の数字は受け付けません。
+- `PortableDecimal.parse_lenient` は、さらに `"1.2E-05"` のような指数表記（指数の絶対値は324まで）と `".5"` / `"1."` を受け付けます。
+  表計算ソフトから出力したデータなど、外部のデータを読み込むためのものです。
+  空白、`"1,000"`、`"12%"`、NaN、Infinity は受け付けません。
 - `PortableDecimal` と `PortableRational` を混ぜた計算はできません。
   `to_rational()` / `to_decimal(scale, rounding)` で明示的に変換してください。
-- 倍精度浮動小数点数からの変換は提供していません。言語間で浮動小数点数の文字列表現が異なるためです。
+- 倍精度浮動小数点数から直接変換するメソッドは提供していません。`PortableDecimal.parse_lenient(repr(x))` で元の浮動小数点数に戻せる値になりますが、
+  浮動小数点数の文字列表現が言語間で異なるため、scaleが一致しないことがあります（例：`1e16`）。
 - ハッシュ値は等価判定と整合しますが、言語間では一致しません。
 
 ## サポート

@@ -66,6 +66,7 @@ void main() {
       "down",
       "floor",
       "ceiling",
+      "up",
     ]);
   });
 
@@ -76,5 +77,48 @@ void main() {
         d(s),
       );
     }
+  });
+
+  test("new methods return the documented types", () {
+    expect(d("2.5").toBigInt(EnumRoundingMode.up), BigInt.from(3));
+    expect(r("-5/2").toBigInt(EnumRoundingMode.up), BigInt.from(-3));
+    expect(d("1.00").isInteger, isTrue);
+    expect(r("3/8").toDecimalExact(), d("0.375"));
+    expect(() => r("1/3").toDecimalExact(), throwsArgumentError);
+    expect(() => d("2").pow(-1), throwsArgumentError);
+    expect(d("2").toRational().pow(-1), r("1/2"));
+  });
+
+  test("stripTrailingZeros keeps equality and hashCode", () {
+    for (final s in ["1.500", "-0.000", "100.00", "0.0100"]) {
+      expect(d(s).stripTrailingZeros(), d(s));
+      expect(d(s).stripTrailingZeros().hashCode, d(s).hashCode);
+    }
+  });
+
+  test("parseLenient reads double.toString() back to the same double", () {
+    for (final x in [
+      0.1,
+      1e-7,
+      1.5e300,
+      5e-324,
+      1.7976931348623157e308,
+      1e16,
+      1e21,
+      -2.2250738585072014e-308,
+      123456.789,
+    ]) {
+      expect(PortableDecimal.parseLenient(x.toString()).toDouble(), x);
+    }
+  });
+
+  test("parseLenient with huge mantissa and exponent", () {
+    final digits = "1234567890" * 1000;
+    final x = PortableDecimal.parseLenient("$digits.${digits}e-324");
+    expect(x.scale, digits.length + 324);
+    expect(
+      x.toString(),
+      "${digits.substring(0, digits.length - 324)}.${digits.substring(digits.length - 324)}$digits",
+    );
   });
 }
